@@ -20,7 +20,7 @@ This gem contains:
 
 ## Installation
 
-    gem install json-patterns
+    gem install json_patterns
 
 You will also need a JSON parser, such as [yajl-ruby][]. This gem works only in
 Ruby 1.9 and higher.
