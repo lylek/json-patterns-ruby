@@ -335,3 +335,9 @@ Ruby variables you've used, but it could help.
 
 Thanks to [Janrain](http://janrain.com), my employer, for permitting me to open source
 this code under my own name.
+
+## Support
+
+Contact lyle@kopnicky.com for help with this gem.
+
+Copyright (c) 2012 Lyle Kopnicky under the BSD2 license.
