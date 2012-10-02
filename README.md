@@ -207,6 +207,18 @@ to the same thing. This pattern would match JSON such as:
 
     { "left": 4, "right": { "left": 2, "right": 5 } }
 
+It's also possible to create cyclic patterns by manipulating structures
+using assignment:
+
+    branch = {left: nil, right: nil}
+    tree = one_of(nil, branch)
+    branch[:left] = tree
+    branch[:right] = tree
+
+This pattern will work as the one declared using `cyclic` above. All
+structural sharing and cycles are preserved in the the transformation
+from a `Pattern` to a `Validation`.
+
 ### The members keyword
 
 You may have noticed that, whenever we use a special keyword within a hash,
