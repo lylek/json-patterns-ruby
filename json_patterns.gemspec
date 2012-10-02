@@ -1,10 +1,10 @@
 Gem::Specification.new do |s|
   s.name        = 'json_patterns'
   s.version     = '0.1.0'
-  s.date        = '2012-09-30'
+  s.date        = '2012-10-01'
   s.summary     = "A DSL of patterns to validate JSON structure"
   s.description = "Validate patterns in JSON using a domain-specific language" +
-    "that looks as much as possible like the JSON you are trying to validate."
+    " that looks as much as possible like the JSON you are trying to validate."
   s.authors     = ["Lyle Kopnicky"]
   s.email       = 'lyle@kopnicky.com'
   s.files       = Dir["lib/*.rb"] + Dir["test/*.rb"]
