@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'json_patterns'
-  s.version     = '0.1.0'
+  s.version     = '0.1.1'
   s.date        = '2012-10-01'
   s.summary     = "A DSL of patterns to validate JSON structure"
   s.description = "Validate patterns in JSON using a domain-specific language" +
