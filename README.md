@@ -80,6 +80,8 @@ You can match some special kinds of strings, too:
 * `URL` matches an `http`, `https` or `ftp` URL
 * A `Regexp` such as `/a.*b/` matches strings that match the `Regexp`
 
+There's a special pattern, `__`, that matches any value.
+
 You can match arrays, but only when every element is expected to have a different value.
 These are called *uniform arrays*.
 
