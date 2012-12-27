@@ -3,6 +3,28 @@ require 'json_patterns'
 require 'set'
 
 class JsonValidationTest < Test::Unit::TestCase
+  def assert_pattern_match(pattern, value, failure_message = nil)
+    validation = Validation.new_from_pattern(pattern)
+    failures = validation.validate_from_root(value)
+    assert_equal [], failures, failure_message
+  end
+
+  def assert_pattern_failures(pattern, value, expected_failures, failure_message = nil)
+    validation = Validation.new_from_pattern(pattern)
+    failures = validation.validate_from_root(value)
+    assert_equal expected_failures, failures, failure_message
+  end
+
+  def assert_pattern_unexpected(pattern, value, failure_params, failure_message = nil)
+    expected_failures = [ValidationUnexpected.new(failure_params)]
+    assert_pattern_failures pattern, value, expected_failures, failure_message
+  end
+
+  def assert_pattern_ambiguity(pattern, value, failure_params, failure_message = nil)
+    expected_failures = [ValidationAmbiguity.new(failure_params)]
+    assert_pattern_failures pattern, value, expected_failures, failure_message
+  end
+
   def test_validation_failure_string_and_json_representation
     failure = ValidationUnexpected.new(
         path: ['santa', 'came', 4, 'you'],
@@ -78,211 +100,136 @@ class JsonValidationTest < Test::Unit::TestCase
   end
 
   def test_literal_string_validation
-    pattern = 'xyz'
-    validation = Validation.new_from_pattern(pattern)
+    assert_pattern_match 'xyz', 'xyz'
 
-    value = 'xyz'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
-
-    value = 'zyx'
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected 'xyz', 'zyx', {
         path: [],
         found: '"zyx"',
         expected: '"xyz"',
-      )], failures
+    }
 
-    value = 4
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected 'xyz', 4, {
         path: [],
         found: 'integer',
         expected: 'string',
-      )], failures
+    }
   end
 
   def test_literal_integer_validation
-    pattern = 54
-    validation = Validation.new_from_pattern(pattern)
+    assert_pattern_match 54, 54
 
-    value = 54
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
-
-    value = 45
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected 54, 45, {
         path: [],
         found: '45',
         expected: '54',
-      )], failures
+    }
 
-    value = 'xyz'
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected 54, 'xyz', {
         path: [],
         found: 'string',
         expected: 'integer',
-      )], failures
+    }
   end
 
   def test_literal_float_validation
-    pattern = 54.32
-    validation = Validation.new_from_pattern(pattern)
+    assert_pattern_match 54.32, 54.32
 
-    value = 54.32
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
-
-    value = 23.45
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected 54.32, 23.45, {
         path: [],
         found: '23.45',
         expected: '54.32',
-      )], failures
+    }
 
-    value = 54
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected 54.32, 54, {
         path: [],
         found: 'integer',
         expected: 'float',
-      )], failures
+    }
   end
 
   def test_regex_match
     pattern = /who+ah/
     validation = Validation.new_from_pattern(pattern)
 
-    value = 'whoooooah'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match /who+ah/, 'whoooooah'
 
-    value = 4
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected /who+ah/, 4, {
         path: [],
         found: 'integer',
         expected: 'string',
-      )], failures
+    }
 
-    value = 'whah'
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected /who+ah/, 'whah', {
         path: [],
         found: '"whah"',
         expected: 'string matching /who+ah/',
-      )], failures
+    }
   end
 
   def test_email_match
     pattern = Email
     validation = Validation.new_from_pattern(pattern)
 
-    value = 1234
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected Email, 1234, {
         path: [],
         found: 'integer',
         expected: 'string',
-      )], failures
+    }
 
-    value = 1234
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
-        path: [],
-        found: 'integer',
-        expected: 'string',
-      )], failures
+    assert_pattern_match Email, 'larry@janrain.com'
 
-    value = 'larry@janrain.com'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
-
-    value = '@.'
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected Email, '@.', {
         path: [],
         found: '"@."',
         expected: 'email',
-      )], failures
+    }
 
-    value = '"Larry Drebes"@janrain.com'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match Email, '"Larry Drebes"@janrain.com'
   end
 
   def test_URL_match
-    pattern = URL
-    validation = Validation.new_from_pattern(pattern)
-
-    value = 1234
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected URL, 1234, {
         path: [],
         found: 'integer',
         expected: 'string',
-      )], failures
+    }
 
-    value = 'http://janrain.com'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match URL, 'http://janrain.com'
 
-    value = 'janrain.com'
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected URL, 'janrain.com', {
         path: [],
         found: '"janrain.com"',
         expected: 'URL',
-      )], failures
+    }
 
-    value = 'http://warbler.janrain.mobi/products/zumba?238234;3512'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match URL, 'http://warbler.janrain.mobi/products/zumba?238234;3512'
 
-    value = 'ftp://larry:coorslight@ftp.janrain.com'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match URL, 'ftp://larry:coorslight@ftp.janrain.com'
   end
 
   def test_literal_nil_match
-    pattern = nil
-    validation = Validation.new_from_pattern(pattern)
+    assert_pattern_match nil, nil
 
-    value = nil
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
-
-    value = ''
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected nil, '', {
         path: [],
         found: 'string',
         expected: 'null',
-      )], failures
+    }
   end
 
   def test_uniform_arrays
     pattern = array_of(String)
     validation = Validation.new_from_pattern(pattern)
 
-    value = { "a" => 'b' }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected array_of(String), { "a" => 'b' }, {
         path: [],
         found: 'object',
         expected: 'array',
-      )], failures
+    }
 
-    value = []
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match array_of(String), []
 
-    value = ['2', 'plus', 3, 'is', 5]
-    failures = validation.validate_from_root(value)
-    assert_equal [
+    assert_pattern_failures array_of(String), ['2', 'plus', 3, 'is', 5], [
       ValidationUnexpected.new(
         path: [2],
         found: 'integer',
@@ -293,32 +240,23 @@ class JsonValidationTest < Test::Unit::TestCase
         found: 'integer',
         expected: 'string',
       ),
-    ], failures
+    ]
 
-    value = ['hello', 'to', 'five', 'people']
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match array_of(String), ['hello', 'to', 'five', 'people']
   end
 
   def test_uniform_objects
     pattern = { many => String }
-    validation = Validation.new_from_pattern(pattern)
 
-    value = ['a', 'b']
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
-        path: [],
-        found: 'array',
-        expected: 'object',
-      )], failures
+    assert_pattern_unexpected pattern, ['a', 'b'], {
+      path: [],
+      found: 'array',
+      expected: 'object',
+    }
 
-    value = {}
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, {}
 
-    value = { "movie" => 'Up', "book" => 12345, "avg" => 46.2 }
-    failures = validation.validate_from_root(value)
-    assert_equal [
+    assert_pattern_failures pattern, { "movie" => 'Up', "book" => 12345, "avg" => 46.2 }, [
       ValidationUnexpected.new(
         path: ['book'],
         found: 'integer',
@@ -329,11 +267,9 @@ class JsonValidationTest < Test::Unit::TestCase
         found: 'float',
         expected: 'string',
       ),
-    ], failures
+    ]
 
-    value = { "movie" => 'Up', "book" => 'Twilight' }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, { "movie" => 'Up', "book" => 'Twilight' }
   end
 
   def test_object_with_fixed_names
@@ -342,22 +278,19 @@ class JsonValidationTest < Test::Unit::TestCase
       age: Integer,
       registered: Boolean,
     }
-    validation = Validation.new_from_pattern(pattern)
 
     value = {
       "name" => 'Bob',
       "age" => 22,
       "registered" => true,
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = {
       "name" => 909,
       "age" => 22,
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [
+    assert_pattern_failures pattern, value, [
       ValidationUnexpected.new(
         path: ['name'],
         found: 'integer',
@@ -368,7 +301,7 @@ class JsonValidationTest < Test::Unit::TestCase
         found: "end of object members",
         expected: 'name: "registered"',
       ),
-    ], failures
+    ]
   end
 
   def test_dispatch_of_case_by_name
@@ -376,18 +309,14 @@ class JsonValidationTest < Test::Unit::TestCase
         { car: String, numDoors: Integer },
         { bike: String, numSpokes: Integer },
       ]}
-    validation = Validation.new_from_pattern(pattern)
     value = { "car" => 'Studebaker', "numDoors" => 4 }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = { "bike" => 'Specialized', "numSpokes" => 30 }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = { "car" => 'Studebaker', "numSpokes" => 4 }
-    failures = validation.validate_from_root(value)
-    assert_equal [
+    assert_pattern_failures pattern, value, [
       ValidationUnexpected.new(
         path: [],
         found: 'names: "numSpokes"',
@@ -398,7 +327,7 @@ class JsonValidationTest < Test::Unit::TestCase
         found: 'names: "numSpokes"',
         expected: 'end of object members',
       ),
-    ], failures
+    ]
   end
 
   def test_dispatch_of_case_by_value
@@ -406,18 +335,14 @@ class JsonValidationTest < Test::Unit::TestCase
         { model: 'Subaru', numDoors: Integer },
         { model: 'Yamaha', numCylinders: Integer },
       ]}
-    validation = Validation.new_from_pattern(pattern)
     value = { "model" => 'Subaru', "numDoors" => 4 }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = { "model" => 'Yamaha', "numCylinders" => 4 }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = { "model" => 'Yamaha', "numDoors" => 4 }
-    failures = validation.validate_from_root(value)
-    assert_equal [
+    assert_pattern_failures pattern, value, [
       ValidationUnexpected.new(
         path: [],
         found: 'names: "numDoors"',
@@ -428,63 +353,49 @@ class JsonValidationTest < Test::Unit::TestCase
         found: 'names: "numDoors"',
         expected: 'end of object members',
       ),
-    ], failures
+    ]
   end
 
   def test_validation_with_good_name_but_unrecognized_value
-    pattern = { life: 'good' }
-    validation = Validation.new_from_pattern(pattern)
-
-    value = { "life" => 'bad' }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected({ life: 'good' }, { "life" => 'bad' }, {
         path: ['life'],
         found: '"bad"',
         expected: '"good"',
-      )], failures
+    })
   end
 
   def test_validation_with_complex_incorrect_value
     pattern = { person: { age: Integer, name: String } }
-    validation = Validation.new_from_pattern(pattern)
-
     value = { "person" => ['Ralph', 'Amy'] }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+
+    assert_pattern_unexpected pattern, value, {
         path: ['person'],
         found: 'array',
         expected: 'object',
-      )], failures
+    }
   end
 
   def test_validation_with_good_name_and_value_not_matching_pattern
     pattern = one_of({ life: 'good' }, { death: 'bad' })
-    validation = Validation.new_from_pattern(pattern)
-
     value = { "life" => 'bad' }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+
+    assert_pattern_unexpected pattern, value, {
         path: ['life'],
         found: '"bad"',
         expected: Set['"good"'],
-      )], failures
+    }
   end
 
   def test_validation_with_alternate_patterns_where_value_may_also_contain_alternate_patterns
     pattern = one_of({ name: one_of('a', 'c') }, { name: one_of('b', 'd') })
-    validation = Validation.new_from_pattern(pattern)
 
-    value = { "name" => 'd' }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, { "name" => 'd' }
 
-    value = { "name" => 'e' }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected pattern, { "name" => 'e' }, {
         path: ['name'],
         found: '"e"',
         expected: Set['"a"', '"c"', '"b"', '"d"'],
-      )], failures
+    }
   end
 
   def test_validation_with_nested_alternate_patterns
@@ -492,20 +403,16 @@ class JsonValidationTest < Test::Unit::TestCase
       one_of('a', 'b'),
       one_of('c', 'd'),
     )
-    validation = Validation.new_from_pattern(pattern)
 
     ['a', 'b', 'c', 'd'].each do |value|
-      failures = validation.validate_from_root(value)
-      assert_equal [], failures
+      assert_pattern_match pattern, value
     end
 
-    value = "e"
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected pattern, "e", {
       path: [],
       found: '"e"',
       expected: Set['"a"', '"b"', '"c"', '"d"'],
-    )], failures
+    }
 
     pattern = {
       one_of => [
@@ -513,16 +420,13 @@ class JsonValidationTest < Test::Unit::TestCase
         { one_of => [{ c: __ }, { d: __ }] },
       ]
     }
-    validation = Validation.new_from_pattern(pattern)
 
     ['a', 'b', 'c', 'd'].each do |name|
-      failures = validation.validate_from_root({ name => 'x' })
-      assert_equal [], failures
+      assert_pattern_match pattern, { name => 'x' }
     end
 
     value = { 'e' => 'x' }
-    failures = validation.validate_from_root(value)
-    assert_equal [
+    assert_pattern_failures pattern, { 'e' => 'x' }, [
       ValidationUnexpected.new(
         path: [],
         found: 'names: "e"',
@@ -534,61 +438,43 @@ class JsonValidationTest < Test::Unit::TestCase
         found: 'names: "e"',
         expected: 'end of object members',
       ),
-    ], failures
+    ]
   end
 
   def test_validation_with_alternate_object_patterns_inside_alternate_value_patterns
     pattern = one_of('x', one_of({ y: Integer }, { z: String }))
-    validation = Validation.new_from_pattern(pattern)
 
-    value = 'x'
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, 'x'
 
-    value = { "y" => 1 }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, { "y" => 1 }
 
-    value = { "z" => "amazing" }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, { "z" => "amazing" }
 
-    value = {}
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected pattern, {}, {
       path: [],
       found: 'end of object members',
       expected: Set['name: "y"', 'name: "z"'],
-    )], failures
+    }
   end
 
   def test_validation_of_optional_members
     pattern = { optional => { count: Integer } }
-    validation = Validation.new_from_pattern(pattern)
 
-    value = {}
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, {}
 
-    value = { "count" => 3 }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, { "count" => 3 }
 
-    value = { "blink" => 3 }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected pattern, { "blink" => 3 }, {
         path: [],
         found: 'names: "blink"',
         expected: 'end of object members',
-      )], failures
+    }
 
-    value = { "count" => 'x' }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected pattern, { "count" => 'x' }, {
         path: ['count'],
         found: 'string',
         expected: 'integer',
-      )], failures
+    }
   end
 
   def test_optional_disjunction
@@ -612,27 +498,15 @@ class JsonValidationTest < Test::Unit::TestCase
     ]
 
     patterns.each_with_index do |pattern, pattern_index|
-      validation = Validation.new_from_pattern(pattern)
+      assert_pattern_match pattern, { "foo" => 1 }, "pattern ##{pattern_index}"
+      assert_pattern_match pattern, { "foo" => 1, "bar" => 2 }, "pattern ##{pattern_index}"
+      assert_pattern_match pattern, { "foo" => 1, "baz" => 2 }, "pattern ##{pattern_index}"
 
-      value = { "foo" => 1 }
-      failures = validation.validate_from_root(value)
-      assert_equal [], failures, "pattern ##{pattern_index}"
-
-      value = { "foo" => 1, "bar" => 2 }
-      failures = validation.validate_from_root(value)
-      assert_equal [], failures, "pattern ##{pattern_index}"
-
-      value = { "foo" => 1, "baz" => 2 }
-      failures = validation.validate_from_root(value)
-      assert_equal [], failures, "pattern ##{pattern_index}"
-
-      value = { "foo" => 1, "quux" => 2 }
-      failures = validation.validate_from_root(value)
-      assert_equal [ValidationUnexpected.new({
+      assert_pattern_unexpected pattern, { "foo" => 1, "quux" => 2 }, {
         path: [],
         found: 'names: "quux"',
         expected: 'end of object members',
-      })], failures, "pattern ##{pattern_index}"
+      }, "pattern ##{pattern_index}"
     end
   end
 
@@ -657,38 +531,27 @@ class JsonValidationTest < Test::Unit::TestCase
     ]
 
     patterns.each_with_index do |pattern, pattern_index|
-      validation = Validation.new_from_pattern(pattern)
-
-      value = { "foo" => 1 }
-      failures = validation.validate_from_root(value)
-      assert_equal [ValidationUnexpected.new({
+      assert_pattern_unexpected pattern, { "foo" => 1 }, {
         path: [],
         found: 'end of object members',
         expected: Set['name: "bar"', 'name: "baz"'],
-      })], failures, "pattern ##{pattern_index}"
+      }, "pattern ##{pattern_index}"
 
-      value = { "foo" => 1, "bar" => 2 }
-      failures = validation.validate_from_root(value)
-      assert_equal [], failures, "pattern ##{pattern_index}"
+      assert_pattern_match pattern, { "foo" => 1, "bar" => 2 }, "pattern ##{pattern_index}"
+      assert_pattern_match pattern, { "foo" => 1, "baz" => 2 }, "pattern ##{pattern_index}"
 
-      value = { "foo" => 1, "baz" => 2 }
-      failures = validation.validate_from_root(value)
-      assert_equal [], failures, "pattern ##{pattern_index}"
-
-      value = { "foo" => 1, "quux" => 2 }
-      failures = validation.validate_from_root(value)
-      assert_equal [
-        ValidationUnexpected.new({
+      assert_pattern_failures pattern, { "foo" => 1, "quux" => 2 }, [
+        ValidationUnexpected.new(
           path: [],
           found: 'names: "quux"',
           expected: Set['name: "bar"', 'name: "baz"'],
-        }),
-        ValidationUnexpected.new({
+        ),
+        ValidationUnexpected.new(
           path: [],
           found: 'names: "quux"',
           expected: 'end of object members',
-        }),
-      ], failures, "pattern ##{pattern_index}"
+        ),
+      ], "pattern ##{pattern_index}"
     end
   end
 
@@ -696,27 +559,19 @@ class JsonValidationTest < Test::Unit::TestCase
     pattern = cyclic { |pattern|
       one_of(nil, { left: pattern, right: pattern })
     }
-    validation = Validation.new_from_pattern(pattern)
 
-    value = nil
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
-
-    value = { "left" => nil, "right" => nil }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, nil
+    assert_pattern_match pattern, { "left" => nil, "right" => nil }
 
     value = { "left" => { "left" => nil, "right" => nil }, "right" => nil }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = { "left" => { "left" => nil, "right" => 1 }, "right" => nil }
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationUnexpected.new(
+    assert_pattern_unexpected pattern, value, {
         path: ['left', 'right'],
         found: '1',
         expected: Set['null', 'object'],
-      )], failures
+    }
   end
 
   def test_cyclic_object_members_expression
@@ -734,15 +589,13 @@ class JsonValidationTest < Test::Unit::TestCase
       name: String,
       members => deets,
     }
-    validation = Validation.new_from_pattern(pattern)
 
     value = {
       "name" => "Tim Cook",
       "address" => '1 Infinite Loop',
       "phone" => '971-555-1212',
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     value = {
       "name" => "Tim Cook",
@@ -754,8 +607,7 @@ class JsonValidationTest < Test::Unit::TestCase
         "phone" => '241-555-1212',
       }
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
   end
 
   def test_using_object_member_patterns_in_value_contexts
@@ -766,7 +618,6 @@ class JsonValidationTest < Test::Unit::TestCase
         }
       }
     }
-    validation = Validation.new_from_pattern(pattern)
 
     value = {
       "foo" => 1,
@@ -777,8 +628,7 @@ class JsonValidationTest < Test::Unit::TestCase
       },
       "baz" => 'hope',
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
 
     pattern = {
       members => cyclic { |es| {
@@ -787,7 +637,6 @@ class JsonValidationTest < Test::Unit::TestCase
         }
       }
     }
-    validation = Validation.new_from_pattern(pattern)
 
     value = {
       "foo" => 1,
@@ -796,8 +645,7 @@ class JsonValidationTest < Test::Unit::TestCase
         "bar" => nil,
       }
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
   end
 
   def test_using_object_patterns_in_object_member_contexts
@@ -809,28 +657,23 @@ class JsonValidationTest < Test::Unit::TestCase
       baz: object,
       members => object,
     }
-    validation = Validation.new_from_pattern(pattern)
 
     value = {
       "foo" => 1,
       "bar" => 2,
       "baz" => { "foo" => 3, "bar" => 4 },
     }
-    failures = validation.validate_from_root(value)
-    assert_equal [], failures
+    assert_pattern_match pattern, value
   end
 
   def test_ambiguous_patterns
     pattern = one_of(/f.ob/, /fr.b/)
-    validation = Validation.new_from_pattern(pattern)
 
-    value = "frob"
-    failures = validation.validate_from_root(value)
-    assert_equal [ValidationAmbiguity.new(
+    assert_pattern_ambiguity pattern, "frob", {
       path: [],
       found: '"frob"',
       overlapping_patterns: ['/f.ob/', '/fr.b/'],
-    )], failures
+    }
   end
 
   def test_array_with_a_fixed_number_of_values
