@@ -137,6 +137,7 @@ will match any of the three strings. Note that the values passed to `one_of` nee
 all be of the same type.
 
 In an object member context, use the keyword `one_of`, with an array value listing the
+
     { id: Integer, one_of => [ { name: String }, { age: Integer } ] }
 
 This will match an object with an name `id` of type integer, and *either* the name
@@ -282,7 +283,7 @@ found.
 
 All errors have a `to_s` method for convenient textual representation.
 
-== Questions and Answers
+## Questions and Answers
 
 **Q:** Why only Ruby 1.9? Can you support 1.8?
 
